@@ -3,20 +3,23 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useMemo } from 'react';
-import { 
-  Users, 
-  Trophy, 
-  LayoutGrid, 
-  Upload, 
-  PlusCircle, 
-  Trash2, 
-  Shuffle, 
+import React, { useState, useMemo, useEffect, useRef } from 'react';
+import {
+  Users,
+  Trophy,
+  LayoutGrid,
+  Upload,
+  PlusCircle,
+  Trash2,
+  Shuffle,
   RotateCcw,
   CheckCircle2,
-  AlertCircle
+  AlertCircle,
+  PartyPopper,
+  Volume2
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import confetti from 'canvas-confetti';
 
 // --- Constants ---
 const MOCK_NAMES = [
@@ -40,13 +43,33 @@ export default function App() {
   const [activeTab, setActiveTab] = useState<Tab>('source');
   const [rawText, setRawText] = useState('');
   const [names, setNames] = useState<string[]>([]);
-  
+
   // Prize Draw State
   const [drawHistory, setDrawHistory] = useState<PrizeWinner[]>([]);
   const [allowRepeat, setAllowRepeat] = useState(false);
   const [lastWinner, setLastWinner] = useState<string | null>(null);
   const [isDrawing, setIsDrawing] = useState(false);
   const [rollingName, setRollingName] = useState<string | null>(null);
+  const [showSuccess, setShowSuccess] = useState(false);
+
+  // Audio Refs
+  const rollingAudio = useRef<HTMLAudioElement | null>(null);
+  const winAudio = useRef<HTMLAudioElement | null>(null);
+
+  useEffect(() => {
+    // 修正後的正確網址
+    rollingAudio.current = new Audio('https://www.soundjay.com/free-music_c2026/midnight-ride-01a.mp3');
+    winAudio.current = new Audio('https://www.soundjay.com/human_c2026/applause-01.mp3');
+
+    if (rollingAudio.current) {
+      rollingAudio.current.loop = true;
+      rollingAudio.current.load();
+    }
+    if (winAudio.current) {
+      winAudio.current.load();
+    }
+  }, []);
+
 
   // Grouping State
   const [groupSize, setGroupSize] = useState(4);
@@ -75,7 +98,17 @@ export default function App() {
       .split(/[\n,;]/)
       .map(n => n.trim())
       .filter(n => n.length > 0);
-    setNames(list); // Carry duplicates for processing/review
+
+    if (list.length > 0) {
+      setNames(list);
+      setShowSuccess(true);
+      setTimeout(() => setShowSuccess(false), 2000);
+
+      // Auto scroll to preview on mobile
+      if (window.innerWidth < 1024) {
+        window.scrollTo({ top: 600, behavior: 'smooth' });
+      }
+    }
   };
 
   const loadMockData = () => {
@@ -102,11 +135,16 @@ export default function App() {
 
   const handleDraw = () => {
     if (availableNames.length === 0 || isDrawing) return;
-    
+
     setIsDrawing(true);
     setLastWinner(null);
-    
+
     // Rolling animation
+    if (rollingAudio.current) {
+      rollingAudio.current.currentTime = 0;
+      rollingAudio.current.play().catch(e => console.error("Rolling audio failed:", e));
+    }
+
     const interval = setInterval(() => {
       const tempIndex = Math.floor(Math.random() * availableNames.length);
       setRollingName(availableNames[tempIndex]);
@@ -117,28 +155,45 @@ export default function App() {
       clearInterval(interval);
       setIsDrawing(false);
       setRollingName(null);
-      
+
+      if (rollingAudio.current) {
+        rollingAudio.current.pause();
+      }
+
       const randomIndex = Math.floor(Math.random() * availableNames.length);
       const winner = availableNames[randomIndex];
-      
+
       setLastWinner(winner);
       setDrawHistory(prev => [
         { id: Math.random().toString(36).substr(2, 9), name: winner, timestamp: new Date() },
         ...prev
       ]);
-    }, 2000);
+
+      // Sound and Confetti effect
+      if (winAudio.current) {
+        winAudio.current.currentTime = 0;
+        winAudio.current.play().catch(e => console.error("Win audio failed:", e));
+      }
+
+      confetti({
+        particleCount: 150,
+        spread: 100,
+        origin: { y: 0.6 },
+        colors: ['#000000', '#FFD700', '#FF0000', '#00FF00', '#0000FF']
+      });
+    }, 4000);
   };
 
   const handleGroup = () => {
     if (names.length === 0) return;
-    
+
     const shuffled = [...names].sort(() => Math.random() - 0.5);
     const result: string[][] = [];
-    
+
     for (let i = 0; i < shuffled.length; i += groupSize) {
       result.push(shuffled.slice(i, i + groupSize));
     }
-    
+
     setGroups(result);
   };
 
@@ -162,7 +217,7 @@ export default function App() {
             </div>
             <h1 className="text-lg font-semibold tracking-tight">HR Pro Toolkit</h1>
           </div>
-          
+
           <nav className="flex gap-1 bg-[#EEEEEB] p-1 rounded-xl">
             {[
               { id: 'source', label: '名单来源', icon: Upload },
@@ -174,8 +229,8 @@ export default function App() {
                 onClick={() => setActiveTab(tab.id as Tab)}
                 className={`
                   flex items-center gap-2 px-4 py-1.5 rounded-lg text-sm font-medium transition-all
-                  ${activeTab === tab.id 
-                    ? 'bg-white shadow-sm text-black' 
+                  ${activeTab === tab.id
+                    ? 'bg-white shadow-sm text-black'
                     : 'text-[#666665] hover:text-black hover:bg-white/50'}
                 `}
               >
@@ -185,7 +240,7 @@ export default function App() {
             ))}
           </nav>
 
-          <button 
+          <button
             onClick={resetAll}
             className="text-xs font-semibold text-[#888887] hover:text-red-500 flex items-center gap-1 transition-colors"
           >
@@ -213,59 +268,60 @@ export default function App() {
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
                 {/* Left Side: Input */}
                 <div className="bg-white rounded-2xl border border-[#DDDDDC] p-8 shadow-sm space-y-6">
-                  <div className="space-y-2">
-                    <label className="text-xs font-bold uppercase tracking-wider text-[#888887]">上传文件</label>
-                    <div className="relative group">
-                      <input
-                        type="file"
-                        accept=".csv,.txt"
-                        onChange={handleFileUpload}
-                        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
-                      />
-                      <div className="border-2 border-dashed border-[#DDDDDC] group-hover:border-black rounded-xl p-8 transition-colors flex flex-col items-center gap-3">
-                        <div className="p-3 bg-[#F5F5F3] rounded-full text-[#666665] group-hover:bg-black group-hover:text-white transition-colors">
-                          <Upload size={24} />
-                        </div>
-                        <div className="text-sm text-center">
-                          <span className="font-semibold">点击上传</span> 或拖拽 CSV/TXT 文件
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="relative">
-                    <div className="absolute inset-0 flex items-center">
-                      <span className="w-full border-t border-[#DDDDDC]" />
-                    </div>
-                    <div className="relative flex justify-center text-xs uppercase">
-                      <span className="bg-white px-2 text-[#888887] font-bold">或者贴上姓名</span>
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
+                  <div className="space-y-4">
                     <div className="flex justify-between items-center">
-                      <label className="text-xs font-bold uppercase tracking-wider text-[#888887]">输入文本</label>
-                      <button 
-                        onClick={loadMockData}
-                        className="text-[10px] font-bold text-black border border-black/10 px-2 py-0.5 rounded hover:bg-black hover:text-white transition-all"
-                      >
-                        使用模拟名单
-                      </button>
+                      <label className="text-xs font-bold uppercase tracking-wider text-[#888887]">员工名单</label>
+                      <div className="flex gap-2">
+                        <div className="relative">
+                          <input
+                            type="file"
+                            accept=".csv,.txt"
+                            onChange={handleFileUpload}
+                            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                          />
+                          <button className="text-[10px] font-bold text-black border border-black/10 px-2 py-1 rounded hover:bg-black hover:text-white transition-all flex items-center gap-1">
+                            <Upload size={10} />
+                            上传文件
+                          </button>
+                        </div>
+                        <button
+                          onClick={loadMockData}
+                          className="text-[10px] font-bold text-black border border-black/10 px-2 py-1 rounded hover:bg-black hover:text-white transition-all"
+                        >
+                          使用模拟名单
+                        </button>
+                      </div>
                     </div>
                     <textarea
                       value={rawText}
                       onChange={(e) => setRawText(e.target.value)}
                       placeholder="例如: 张三, 李四, 王五 (每行一个或逗号分隔)"
-                      className="w-full h-48 p-4 bg-[#F5F5F3] border border-[#DDDDDC] rounded-xl focus:outline-none focus:ring-1 focus:ring-black transition-all resize-none font-mono text-sm"
+                      className="w-full h-64 p-4 bg-[#F5F5F3] border border-[#DDDDDC] rounded-xl focus:outline-none focus:ring-1 focus:ring-black transition-all resize-none font-mono text-sm"
                     />
                   </div>
 
                   <button
-                    onClick={handleProcessNames}
-                    className="w-full bg-black text-white py-4 rounded-xl font-bold text-lg hover:scale-[1.01] active:scale-[0.99] transition-all flex items-center justify-center gap-2"
+                    onClick={() => handleProcessNames()}
+                    disabled={!rawText.trim()}
+                    className={`
+                      w-full py-4 rounded-xl font-bold text-lg transition-all flex items-center justify-center gap-2
+                      ${showSuccess
+                        ? 'bg-green-500 text-white scale-[0.98]'
+                        : 'bg-black text-white hover:scale-[1.01] active:scale-[0.99]'}
+                      ${!rawText.trim() ? 'opacity-50 cursor-not-allowed' : ''}
+                    `}
                   >
-                    <PlusCircle size={20} />
-                    确认名单
+                    {showSuccess ? (
+                      <>
+                        <CheckCircle2 size={20} />
+                        已导入名单
+                      </>
+                    ) : (
+                      <>
+                        <PlusCircle size={20} />
+                        确认名单
+                      </>
+                    )}
                   </button>
                 </div>
 
@@ -280,7 +336,7 @@ export default function App() {
                         </h3>
                         <div className="flex gap-3">
                           {duplicateNames.length > 0 && (
-                            <button 
+                            <button
                               onClick={removeDuplicates}
                               className="text-xs font-bold text-red-500 hover:bg-red-50 px-2 py-1 rounded-lg transition-colors flex items-center gap-1"
                             >
@@ -288,7 +344,7 @@ export default function App() {
                               移除 {duplicateNames.length} 处重复
                             </button>
                           )}
-                          <button 
+                          <button
                             onClick={() => setNames([])}
                             className="text-xs text-[#888887] hover:text-red-500 transition-colors"
                           >
@@ -296,20 +352,20 @@ export default function App() {
                           </button>
                         </div>
                       </div>
-                      
+
                       <div className="flex flex-wrap gap-2 overflow-y-auto max-h-[400px] pr-2 custom-scrollbar content-start">
                         {names.map((name, i) => {
                           const isDuplicate = duplicateNames.includes(name);
                           return (
-                            <motion.span 
-                              key={i} 
+                            <motion.span
+                              key={i}
                               initial={{ opacity: 0, scale: 0.8 }}
                               animate={{ opacity: 1, scale: 1 }}
                               transition={{ delay: i * 0.01 }}
                               className={`
                                 px-4 py-2 border rounded-xl text-sm font-medium transition-colors relative group
-                                ${isDuplicate 
-                                  ? 'bg-red-50 border-red-200 text-red-700 hover:border-red-400' 
+                                ${isDuplicate
+                                  ? 'bg-red-50 border-red-200 text-red-700 hover:border-red-400'
                                   : 'bg-[#F5F5F3] border-[#DDDDDC] hover:border-black'}
                               `}
                             >
@@ -346,7 +402,7 @@ export default function App() {
                       </div>
                       <div className="space-y-1">
                         <p className="font-bold text-[#666665]">尚未导入名单</p>
-                        <p className="text-sm text-[#888887]">在左侧输入姓名或上传文件后<br/>点击“确认名单”即可在此查看</p>
+                        <p className="text-sm text-[#888887]">在左侧输入姓名或上传文件后<br />点击“确认名单”即可在此查看</p>
                       </div>
                     </div>
                   )}
@@ -371,7 +427,7 @@ export default function App() {
                         <AlertCircle size={32} />
                       </div>
                       <h3 className="text-xl font-semibold">请先设定名单</h3>
-                      <button 
+                      <button
                         onClick={() => setActiveTab('source')}
                         className="bg-black text-white px-6 py-2 rounded-full text-sm font-bold"
                       >
@@ -425,10 +481,10 @@ export default function App() {
                             {isDrawing ? '正在抽取...' : '开始抽奖'}
                           </span>
                         </div>
-                        
+
                         <div className="flex items-center gap-8">
                           <label className="flex items-center gap-2 cursor-pointer group">
-                             <div 
+                            <div
                               className={`w-10 h-5 rounded-full p-1 transition-colors ${allowRepeat ? 'bg-black' : 'bg-[#DDDDDC]'}`}
                               onClick={() => setAllowRepeat(!allowRepeat)}
                             >
@@ -501,7 +557,7 @@ export default function App() {
                     </div>
                   </div>
                 </div>
-                
+
                 <button
                   onClick={handleGroup}
                   disabled={names.length === 0}
@@ -541,17 +597,17 @@ export default function App() {
                 </div>
               ) : (
                 <div className="bg-white/50 border-2 border-dashed border-[#DDDDDC] rounded-3xl h-64 flex flex-col items-center justify-center gap-4">
-                   <div className="p-4 bg-white rounded-full shadow-sm text-[#DDDDDC]">
-                      <LayoutGrid size={48} />
-                   </div>
-                   <p className="text-sm font-bold text-[#888887] uppercase tracking-widest">点击上方按钮开始分组</p>
+                  <div className="p-4 bg-white rounded-full shadow-sm text-[#DDDDDC]">
+                    <LayoutGrid size={48} />
+                  </div>
+                  <p className="text-sm font-bold text-[#888887] uppercase tracking-widest">点击上方按钮开始分组</p>
                 </div>
               )}
             </motion.div>
           )}
         </AnimatePresence>
       </main>
-      
+
       <style>{`
         .custom-scrollbar::-webkit-scrollbar {
           width: 4px;
