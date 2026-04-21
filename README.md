@@ -2,19 +2,51 @@
 <img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
 </div>
 
-# Run and deploy your AI Studio app
+# HR- Project
 
-This contains everything you need to run your app locally.
+A React-based AI application powered by Gemini.
 
-View your app in AI Studio: https://ai.studio/apps/851e09a3-cc8c-4f94-8cb5-befae6e36c30
+## 🚀 Features
+- React + Vite + TypeScript
+- Tailwind CSS v4
+- Google Gemini AI Integration
 
-## Run Locally
+## 🛠️ Local Development
 
-**Prerequisites:**  Node.js
+### Prerequisites
+- Node.js (v20 or higher recommended)
+- npm
 
+### Setup
+1. **Install dependencies:**
+   ```bash
+   npm install
+   ```
+2. **Environment Variables:**
+   Copy `.env.example` to `.env.local` and set your `GEMINI_API_KEY`:
+   ```bash
+   cp .env.example .env.local
+   ```
+3. **Run the app:**
+   ```bash
+   npm run dev
+   ```
+   The app will be available at `http://localhost:3000`.
 
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+## 📦 Deployment
+
+### GitHub Actions
+This project is configured with GitHub Actions for automatic deployment to **GitHub Pages**.
+
+1. Go to your GitHub repository settings.
+2. Navigate to **Pages**.
+3. Under **Build and deployment > Source**, select **GitHub Actions**.
+4. Every push to the `main` branch will now trigger a build and deploy.
+
+## 📄 Scripts
+- `npm run dev`: Start development server
+- `npm run build`: Build for production
+- `npm run lint`: Run TypeScript type checking
+- `npm run preview`: Preview production build locally
+- `npm run clean`: Remove build artifacts
+
