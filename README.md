@@ -16,7 +16,7 @@ A React-based AI application powered by Gemini.
 ### Prerequisites
 - Node.js (v20 or higher recommended)
 - npm
-
+ 
 ### Setup
 1. **Install dependencies:**
    ```bash
